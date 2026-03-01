@@ -241,6 +241,19 @@ mypy pdf_compressor/
 
 ---
 
-## License
+## Licensing
 
-MIT
+This project is licensed under the **GNU General Public License v3.0 or later** (GPL-3.0-or-later).
+
+### Why GPL?
+
+PDF Compressor is free software — free as in freedom, not just free of charge. The GPL was chosen deliberately to ensure that this project and all derivative works remain open-source forever:
+
+- **You can use it freely** — run it anywhere, for any purpose.
+- **You can study and modify it** — the source code is always available.
+- **You can distribute copies** — share the software with anyone.
+- **If you distribute modified versions**, you must release the source under the same GPL terms.
+
+This prevents companies from taking the code, improving it in proprietary forks, and selling it as closed-source software without giving back to the community.
+
+See the [LICENSE](LICENSE) file for the full license text, or visit <https://www.gnu.org/licenses/gpl-3.0.html>.
