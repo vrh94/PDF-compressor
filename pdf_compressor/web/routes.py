@@ -6,6 +6,7 @@ import io
 import os
 import tempfile
 import threading
+import time
 import uuid
 from pathlib import Path
 
@@ -50,6 +51,67 @@ class JobStore:
 
 
 job_store = JobStore()
+
+
+# ── sliding-window rate limiter ───────────────────────────────────────────────
+
+class _RateLimiter:
+    """
+    In-process sliding-window rate limiter — no external dependencies.
+
+    Suitable for a single gunicorn worker (workers=1, as this app is
+    configured).  If you scale to multiple workers or processes, replace this
+    with flask-limiter backed by Redis so the window is shared across workers:
+
+        pip install flask-limiter[redis]
+        limiter = Limiter(app, storage_uri="redis://localhost:6379")
+    """
+
+    def __init__(self, max_requests: int, window_seconds: int) -> None:
+        self._max = max_requests
+        self._window = window_seconds
+        self._buckets: dict[str, list[float]] = {}
+        self._lock = threading.Lock()
+
+    def is_allowed(self, key: str) -> bool:
+        """
+        Return True and record the hit if under the limit.
+        Return False without recording if the limit is exceeded.
+        """
+        now = time.time()
+        cutoff = now - self._window
+        with self._lock:
+            timestamps = [t for t in self._buckets.get(key, []) if t > cutoff]
+            if len(timestamps) >= self._max:
+                self._buckets[key] = timestamps
+                return False
+            timestamps.append(now)
+            self._buckets[key] = timestamps
+            return True
+
+    def retry_after(self, key: str) -> int:
+        """Seconds until the oldest hit in the window expires."""
+        now = time.time()
+        cutoff = now - self._window
+        with self._lock:
+            timestamps = sorted(t for t in self._buckets.get(key, []) if t > cutoff)
+        if not timestamps:
+            return 0
+        return max(0, int(timestamps[0] + self._window - now) + 1)
+
+    def evict_stale(self) -> None:
+        """Drop buckets with no recent activity (call periodically to cap RAM)."""
+        cutoff = time.time() - self._window
+        with self._lock:
+            stale = [k for k, ts in self._buckets.items() if not any(t > cutoff for t in ts)]
+            for k in stale:
+                del self._buckets[k]
+
+
+# 10 compression uploads per IP per minute.
+# This is intentionally conservative — compression is CPU-heavy and we run
+# a single gunicorn worker.  Raise the limit if you add a job queue.
+_upload_limiter = _RateLimiter(max_requests=10, window_seconds=60)
 
 
 # ── background worker ─────────────────────────────────────────────────────────
@@ -115,6 +177,20 @@ def health():
 
 @blueprint.route("/compress", methods=["POST"])
 def compress():
+    # ── rate limiting ─────────────────────────────────────────────────────────
+    # Use the direct TCP connection address — not X-Forwarded-For, which is
+    # trivially spoofed by a client.  If you run behind a trusted reverse proxy
+    # (nginx, Caddy) that rewrites remote_addr, set TRUSTED_PROXIES instead.
+    client_ip = request.remote_addr or "unknown"
+    if not _upload_limiter.is_allowed(client_ip):
+        retry = _upload_limiter.retry_after(client_ip)
+        log.warning("Rate limit exceeded for %s", client_ip)
+        return (
+            jsonify({"error": "Too many uploads. Please wait before trying again."}),
+            429,
+            {"Retry-After": str(retry)},
+        )
+
     if "file" not in request.files:
         return jsonify({"error": "No file provided"}), 400
 

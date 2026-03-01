@@ -1,0 +1,137 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Cancel any in-progress run for the same branch so stale runs don't waste
+# minutes when you push again quickly.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ── Test matrix ─────────────────────────────────────────────────────────────
+  test:
+    name: Test (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false          # keep other versions running even if one fails
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      # Ghostscript is an optional engine; installing it here gives us full
+      # engine coverage in the test matrix (the GhostscriptEngine test is
+      # skipped otherwise).
+      - name: Install Ghostscript
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends ghostscript
+
+      # Install the package in editable mode so imports resolve correctly.
+      # Include [dev] for pytest/ruff/mypy and [web] to test Flask routes.
+      - name: Install project + dev dependencies
+        run: pip install -e ".[dev,web]"
+
+      - name: Lint (ruff)
+        run: ruff check .
+
+      # Type-checking is informational on first publish — it reveals issues but
+      # shouldn't gate the build until the codebase is fully annotated.
+      - name: Type-check (mypy)
+        run: mypy pdf_compressor/ --ignore-missing-imports
+        continue-on-error: true
+
+      - name: Run tests with coverage
+        run: |
+          pytest \
+            --cov=pdf_compressor \
+            --cov-report=xml \
+            --cov-report=term-missing \
+            -v
+
+      # Upload coverage only once — no need for three identical reports.
+      - name: Upload coverage to Codecov
+        if: matrix.python-version == '3.11'
+        uses: codecov/codecov-action@v4
+        with:
+          file: coverage.xml
+          flags: unittests
+          fail_ci_if_error: false   # never let a Codecov outage break CI
+
+  # ── Docker build + smoke-test ────────────────────────────────────────────────
+  # Only runs on pushes to main (not on PRs) to avoid burning Docker build
+  # minutes on every draft PR.
+  docker:
+    name: Docker build + healthcheck
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build image
+        run: docker build -t pdf-compressor:ci .
+
+      # Start the container, wait for gunicorn to be ready, then verify the
+      # /health endpoint returns HTTP 200.  Using `timeout` + `until` avoids
+      # a fixed `sleep` that would make the job fragile on slow runners.
+      - name: Smoke-test /health endpoint
+        run: |
+          docker run -d --name ci-smoke -p 5000:5000 pdf-compressor:ci
+          echo "Waiting for gunicorn…"
+          timeout 60 bash -c \
+            'until curl -sf http://localhost:5000/health; do sleep 2; done'
+          echo ""
+          echo "Health OK — stopping container"
+          docker stop ci-smoke
+          docker rm ci-smoke
+
+  # ── Desktop binary (macOS) ───────────────────────────────────────────────────
+  # Runs on every push to main.  Produces a downloadable .app artifact so
+  # maintainers can verify a new release builds on macOS without a local machine.
+  desktop:
+    name: Desktop binary (macOS)
+    runs-on: macos-latest
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install desktop deps + PyInstaller
+        run: pip install -e ".[desktop]" pyinstaller
+
+      - name: Build .app bundle
+        run: bash build.sh
+
+      # Upload the .app as a workflow artifact so it can be downloaded from
+      # the GitHub Actions run page for ad-hoc testing.
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: PDF-Compressor-macOS
+          path: dist/
+          retention-days: 14
