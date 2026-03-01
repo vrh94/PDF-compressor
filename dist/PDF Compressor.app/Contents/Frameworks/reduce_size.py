@@ -1,0 +1,1 @@
+../Resources/reduce_size.py

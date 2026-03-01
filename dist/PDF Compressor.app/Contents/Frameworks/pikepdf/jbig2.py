@@ -1,0 +1,1 @@
+../../Resources/pikepdf/jbig2.py

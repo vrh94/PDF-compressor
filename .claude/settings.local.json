@@ -8,7 +8,12 @@
       "Bash(echo \"exit: $?\")",
       "Bash(ssh-keyscan github.com)",
       "Bash(~/.ssh/known_hosts)",
-      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:6000/)"
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:6000/)",
+      "Bash(git pull origin main --no-edit)",
+      "Bash(git pull origin main --no-edit --allow-unrelated-histories)",
+      "Bash(git checkout --ours README.md)",
+      "Bash(git add README.md)",
+      "Bash(chmod +x /Users/aljazvrhovnik/Projects/reduce_pdf_size/build.sh)"
     ]
   }
 }
