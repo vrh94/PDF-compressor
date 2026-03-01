@@ -16,7 +16,10 @@
       "Bash(chmod +x /Users/aljazvrhovnik/Projects/reduce_pdf_size/build.sh)",
       "Bash(python -m pytest tests/test_validation.py tests/test_engines.py -v --tb=short)",
       "Bash(python -m pytest tests/ -v --tb=short)",
-      "Bash(python -m pytest tests/ --tb=short)"
+      "Bash(python -m pytest tests/ --tb=short)",
+      "Bash(python -c \"import pikepdf, pypdf, PIL, tqdm; print\\(''All packages found''\\)\")",
+      "Bash(python -c \"import sys; print\\(sys.executable\\)\")",
+      "Bash(python -m pytest tests/ --tb=short -q)"
     ]
   }
 }
