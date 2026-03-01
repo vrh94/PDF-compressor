@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PDF Compressor</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #f0f2f5;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem;
+      color: #1a1a2e;
+    }
+
+    .card {
+      background: #fff;
+      border-radius: 16px;
+      box-shadow: 0 4px 24px rgba(0,0,0,.08);
+      padding: 2.5rem 2rem;
+      width: 100%;
+      max-width: 480px;
+      text-align: center;
+    }
+
+    h1 {
+      font-size: 1.6rem;
+      font-weight: 700;
+      margin-bottom: .25rem;
+    }
+
+    .subtitle {
+      color: #666;
+      font-size: .9rem;
+      margin-bottom: 2rem;
+    }
+
+    /* ---------- drop zone ---------- */
+    .drop-zone {
+      border: 2px dashed #c8ccd4;
+      border-radius: 12px;
+      padding: 2.5rem 1.5rem;
+      cursor: pointer;
+      transition: border-color .2s, background .2s;
+      position: relative;
+    }
+    .drop-zone:hover,
+    .drop-zone.drag-over {
+      border-color: #4f6ef7;
+      background: #f5f7ff;
+    }
+    .drop-zone svg { color: #9ba3b8; margin-bottom: .75rem; }
+    .drop-zone p  { font-size: .95rem; color: #555; line-height: 1.5; }
+    .drop-zone input[type="file"] {
+      position: absolute; inset: 0; opacity: 0; cursor: pointer;
+    }
+
+    /* ---------- buttons ---------- */
+    .btn {
+      display: inline-block;
+      margin-top: 1.5rem;
+      padding: .65rem 1.6rem;
+      border: none;
+      border-radius: 8px;
+      font-size: .95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity .15s, transform .1s;
+    }
+    .btn:active { transform: scale(.97); }
+    .btn-primary { background: #4f6ef7; color: #fff; }
+    .btn-primary:hover { opacity: .88; }
+    .btn-ghost {
+      background: transparent;
+      color: #4f6ef7;
+      border: 2px solid #4f6ef7;
+      margin-top: 1rem;
+    }
+    .btn-ghost:hover { background: #f5f7ff; }
+
+    /* ---------- spinner ---------- */
+    .spinner {
+      width: 44px; height: 44px;
+      border: 4px solid #e8eaf0;
+      border-top-color: #4f6ef7;
+      border-radius: 50%;
+      animation: spin .8s linear infinite;
+      margin: 0 auto .75rem;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ---------- result ---------- */
+    .stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: .75rem;
+      margin: 1.25rem 0 .5rem;
+    }
+    .stat-box {
+      background: #f5f7ff;
+      border-radius: 10px;
+      padding: .75rem .5rem;
+    }
+    .stat-box .label { font-size: .7rem; color: #888; text-transform: uppercase; letter-spacing: .04em; }
+    .stat-box .value { font-size: 1rem; font-weight: 700; margin-top: .2rem; }
+    .stat-box.highlight .value { color: #26a65b; }
+
+    /* ---------- error ---------- */
+    .error-box {
+      background: #fff3f3;
+      border: 1px solid #ffb3b3;
+      border-radius: 10px;
+      padding: 1rem;
+      color: #c0392b;
+      font-size: .9rem;
+      margin-top: 1rem;
+    }
+
+    /* ---------- utils ---------- */
+    .hidden { display: none !important; }
+    .mt1 { margin-top: 1rem; }
+  </style>
+</head>
+<body>
+<div class="card">
+  <h1>PDF Compressor</h1>
+  <p class="subtitle">Upload a PDF and get a smaller version automatically.</p>
+
+  <!-- Upload panel -->
+  <div id="uploadPanel">
+    <div class="drop-zone" id="dropZone">
+      <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" fill="currentColor" viewBox="0 0 24 24">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 7V3.5L18.5 9H13zm-2 5v4h-2v-4H6l4-4 4 4h-3z"/>
+      </svg>
+      <p><strong>Drag &amp; drop</strong> your PDF here</p>
+      <p style="font-size:.82rem;color:#999;margin-top:.3rem">or click to browse</p>
+      <input type="file" id="fileInput" accept=".pdf" />
+    </div>
+    <div id="errorBox" class="error-box hidden"></div>
+  </div>
+
+  <!-- Processing panel -->
+  <div id="processingPanel" class="hidden">
+    <div class="spinner"></div>
+    <p style="color:#555">Compressing<span id="dots"></span></p>
+    <p style="font-size:.8rem;color:#aaa;margin-top:.4rem">Large files can take a few minutes.</p>
+  </div>
+
+  <!-- Result panel -->
+  <div id="resultPanel" class="hidden">
+    <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" fill="#26a65b" viewBox="0 0 24 24">
+      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+    </svg>
+    <p style="font-weight:600;margin-top:.5rem">Download started!</p>
+    <div class="stats">
+      <div class="stat-box">
+        <div class="label">Original</div>
+        <div class="value" id="origSize">—</div>
+      </div>
+      <div class="stat-box">
+        <div class="label">Compressed</div>
+        <div class="value" id="newSize">—</div>
+      </div>
+      <div class="stat-box highlight">
+        <div class="label">Saved</div>
+        <div class="value" id="reduction">—</div>
+      </div>
+    </div>
+    <button class="btn btn-ghost" id="resetBtn">Compress another file</button>
+  </div>
+</div>
+
+<script>
+  const dropZone       = document.getElementById('dropZone');
+  const fileInput      = document.getElementById('fileInput');
+  const uploadPanel    = document.getElementById('uploadPanel');
+  const processingPanel = document.getElementById('processingPanel');
+  const resultPanel    = document.getElementById('resultPanel');
+  const errorBox       = document.getElementById('errorBox');
+  const resetBtn       = document.getElementById('resetBtn');
+
+  // Animated dots while processing
+  let dotsInterval;
+  function startDots() {
+    let n = 0;
+    const el = document.getElementById('dots');
+    dotsInterval = setInterval(() => { el.textContent = '.'.repeat((n++ % 3) + 1); }, 500);
+  }
+  function stopDots() { clearInterval(dotsInterval); }
+
+  function showUpload()     { uploadPanel.classList.remove('hidden'); processingPanel.classList.add('hidden'); resultPanel.classList.add('hidden'); }
+  function showProcessing() { uploadPanel.classList.add('hidden');    processingPanel.classList.remove('hidden'); resultPanel.classList.add('hidden'); startDots(); }
+  function showResult()     { uploadPanel.classList.add('hidden');    processingPanel.classList.add('hidden'); resultPanel.classList.remove('hidden'); stopDots(); }
+  function showError(msg)   { errorBox.textContent = msg; errorBox.classList.remove('hidden'); }
+  function clearError()     { errorBox.classList.add('hidden'); }
+
+  // Drag & drop
+  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+  dropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropZone.classList.remove('drag-over');
+    const file = e.dataTransfer.files[0];
+    if (file) handleFile(file);
+  });
+
+  fileInput.addEventListener('change', () => {
+    if (fileInput.files[0]) handleFile(fileInput.files[0]);
+  });
+
+  resetBtn.addEventListener('click', () => {
+    fileInput.value = '';
+    clearError();
+    showUpload();
+  });
+
+  async function handleFile(file) {
+    if (!file.name.toLowerCase().endsWith('.pdf')) {
+      showError('Please select a PDF file.');
+      return;
+    }
+    clearError();
+    showProcessing();
+
+    const form = new FormData();
+    form.append('file', file);
+
+    try {
+      const res = await fetch('/compress', { method: 'POST', body: form });
+
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}));
+        throw new Error(json.error || `Server error ${res.status}`);
+      }
+
+      // Trigger browser download from the blob
+      const blob = await res.blob();
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement('a');
+      const disposition = res.headers.get('Content-Disposition') || '';
+      const nameMatch   = disposition.match(/filename="?([^"]+)"?/);
+      a.download = nameMatch ? nameMatch[1] : file.name.replace('.pdf', '_reduced.pdf');
+      a.href = url;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
+
+      // Show stats
+      document.getElementById('origSize').textContent  = res.headers.get('X-Original-Size')   || '—';
+      document.getElementById('newSize').textContent   = res.headers.get('X-Compressed-Size')  || '—';
+      document.getElementById('reduction').textContent = res.headers.get('X-Reduction')         || '—';
+      showResult();
+
+    } catch (err) {
+      stopDots();
+      showUpload();
+      showError(err.message || 'Compression failed. Please try again.');
+    }
+  }
+</script>
+</body>
+</html>
