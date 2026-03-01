@@ -13,7 +13,10 @@
       "Bash(git pull origin main --no-edit --allow-unrelated-histories)",
       "Bash(git checkout --ours README.md)",
       "Bash(git add README.md)",
-      "Bash(chmod +x /Users/aljazvrhovnik/Projects/reduce_pdf_size/build.sh)"
+      "Bash(chmod +x /Users/aljazvrhovnik/Projects/reduce_pdf_size/build.sh)",
+      "Bash(python -m pytest tests/test_validation.py tests/test_engines.py -v --tb=short)",
+      "Bash(python -m pytest tests/ -v --tb=short)",
+      "Bash(python -m pytest tests/ --tb=short)"
     ]
   }
 }

@@ -1,0 +1,86 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "pdf-compressor"
+version = "1.0.0"
+description = "Reduce PDF file size using multiple compression engines (Ghostscript, pikepdf, pypdf)."
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.10"
+keywords = ["pdf", "compression", "ghostscript", "pikepdf", "pypdf"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Multimedia :: Graphics :: Graphics Conversion",
+    "Topic :: Utilities",
+]
+
+# Core deps — pikepdf and pypdf are the built-in engines; Pillow is needed for
+# image recompression inside pikepdf engine.
+dependencies = [
+    "pikepdf>=8.0",
+    "pypdf>=4.0",
+    "Pillow>=10.0",
+]
+
+[project.optional-dependencies]
+web = [
+    "flask>=3.0",
+    "gunicorn>=21.0",
+]
+desktop = [
+    "PyQt6>=6.6",
+]
+dev = [
+    "pytest>=8.0",
+    "pytest-cov",
+    "ruff",
+    "mypy",
+]
+
+[project.scripts]
+pdf-compressor = "pdf_compressor.cli.main:main"
+
+[project.urls]
+Homepage = "https://github.com/vrh94/PDF-compressor"
+Repository = "https://github.com/vrh94/PDF-compressor"
+Issues = "https://github.com/vrh94/PDF-compressor/issues"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["pdf_compressor*"]
+
+[tool.setuptools.package-data]
+"pdf_compressor.web" = ["templates/**/*", "static/**/*"]
+
+# ── pytest ────────────────────────────────────────────────────────────────────
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-v --tb=short"
+
+# ── ruff ──────────────────────────────────────────────────────────────────────
+
+[tool.ruff]
+line-length = 99
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP"]
+ignore = ["E501"]
+
+# ── mypy ──────────────────────────────────────────────────────────────────────
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true
+ignore_missing_imports = true
