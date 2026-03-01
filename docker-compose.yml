@@ -1,0 +1,6 @@
+services:
+  pdf-compressor:
+    build: .
+    ports:
+      - "8080:5000"
+    restart: unless-stopped
